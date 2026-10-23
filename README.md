@@ -1,14 +1,10 @@
 # Expense Tracker App — Starter Project
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=500&size=18&duration=2600&pause=850&color=58A6FF&center=true&vCenter=true&width=520&lines=Build+%E2%80%A2+Test+%E2%80%A2+Improve" alt="Animated banner: Build, Test, Improve" />
-</p>
-<p align="center">
   <img src="https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white" alt="HTML5 badge" />
   <img src="https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white" alt="CSS3 badge" />
   <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=white" alt="JavaScript badge" />
 </p>
-
 
 This short, portfolio-focused description explains what the project is, how it works, and what to highlight when showing it in your portfolio. It describes the application in clear, step-by-step prose so reviewers can quickly understand the idea, core features, and the implementation approach.
 
