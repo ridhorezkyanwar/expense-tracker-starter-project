@@ -1,250 +1,276 @@
 /**
- * ========================================================
- * Expense Tracker App — main.js
- * ========================================================
- * Tulis seluruh kode JavaScript kamu di sini.
+ * Expense Tracker — browser-only transaction management.
+ * Transactions are stored locally in this browser; no server receives them.
  */
 
-// TODO [Basic] Buat variabel array untuk menyimpan semua data transaksi, contoh: let transactions = []
+const STORAGE_KEY = "transactions";
 let transactions = [];
-
-// Variabel untuk menyimpan ID transaksi yang sedang diedit (null jika mode tambah)
 let editingid = null;
-// TODO [Basic] Buat fungsi untuk menghasilkan ID unik secara otomatis, contoh: gunakan +new Date()
+let searchQuery = "";
+
+const incomeList = document.getElementById("incomeList");
+const expenseList = document.getElementById("expenseList");
+const transactionForm = document.getElementById("transactionForm");
+const titleInput = document.getElementById("transactionFormTitleInput");
+const amountInput = document.getElementById("transactionFormAmountInput");
+const dateInput = document.getElementById("transactionFormDateInput");
+const typeSelect = document.getElementById("transactionFormTypeSelect");
+const submitButton =
+    transactionForm?.querySelector('button[type="submit"]') ||
+    document.querySelector('[data-testid="transactionFormSubmitButton"]');
+const balanceAmount = document.querySelector(".tracker-summary__balance-amount");
+const incomeAmount = document.querySelector(".tracker-summary__stat-amount--income");
+const expenseAmount = document.querySelector(".tracker-summary__stat-amount--expense");
+const searchInput = document.getElementById("searchTransactionFormTitleInput");
+const searchForm = document.getElementById("searchTransactionForm");
+
+function todayLocalDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
 function generateid() {
-    return +new Date();
+    let id = Date.now();
+    while (transactions.some((transaction) => transaction.id === id)) id += 1;
+    return id;
 }
 
-/**
- * ========================================================
- * Kriteria 1: Memanipulasi DOM untuk Form dan Daftar Transaksi
- * ========================================================
- */
-// TODO [Basic] Ambil elemen kontainer incomeList dan expenseList dari DOM
-const incomeList = document.getElementById('incomeList');
-const expenseList = document.getElementById('expenseList');
-
-// elemen form 
-const transactionForm = document.getElementById('transactionForm');
-const titleInput = document.getElementById('transactionFormTitleInput');
-const amountInput = document.getElementById('transactionFormAmountInput');
-const typeSelect = document.getElementById('transactionFormTypeSelect');
-// Tombol submit tidak punya id di HTML, ambil dari dalam form (fallback ke data-testid)
-const submitButton = (transactionForm && transactionForm.querySelector('button[type="submit"]')) || document.querySelector('[data-testid="transactionFormSubmitButton"]');
-
-// elemen dashboard (HTML memakai class, bukan id)
-const balanceAmount = document.querySelector('.tracker-summary__balance-amount');
-const incomeAmount = document.querySelector('.tracker-summary__stat-amount--income');
-const expenseAmount = document.querySelector('.tracker-summary__stat-amount--expense');
-
-// elemen pencarian
-const searchInput = document.getElementById('searchTransactionFormTitleInput');
-// mencegah form pencarian submit (agar tidak reload halaman saat tekan Enter)
-const searchForm = document.getElementById('searchTransactionForm');
-if (searchForm) {
-    searchForm.addEventListener('submit', (e) => e.preventDefault());
+function formatRupiah(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toLocaleString("id-ID") : "0";
 }
 
+function saveTransactionsToStorage() {
+    try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+        return true;
+    } catch (error) {
+        console.warn("Transaksi tidak dapat disimpan di browser ini.", error);
+        return false;
+    }
+}
 
-/**
- * TODO [Basic]:
- * Buat fungsi untuk menampilkan (render) semua transaksi ke layar:
- *  - Kosongkan kontainer terlebih dahulu sebelum mengisi ulang
- *  - Gunakan perulangan, buat setiap elemen kartu dengan document.createElement()
- *  - Pastikan setiap elemen memiliki atribut data-testid yang sesuai (lihat panduan di rubrik)
- *  - Masukkan kartu ke kontainer yang tepat: income → incomeList, expense → expenseList
- */
+function normalizeTransaction(value) {
+    if (!value || typeof value !== "object") return null;
 
-function renderTransactions(filteredList = null) {
-    // Kosongkan kontainer terlebih dahulu
-    incomeList.innerHTML = '';
-    expenseList.innerHTML = '';
+    const title = typeof value.title === "string" ? value.title.trim() : "";
+    const amount = Number(value.amount);
+    const type = value.type;
+    const hasUsableId =
+        (typeof value.id === "number" && Number.isFinite(value.id)) ||
+        (typeof value.id === "string" && value.id.trim() !== "");
 
-    // Tentukan list yang akan dirender (bisa dipanggil dengan hasil filter)
-    const listToRender = filteredList !== null ? filteredList : transactions;
+    if (!hasUsableId || !title || !Number.isFinite(amount) || amount < 1) return null;
+    if (type !== "income" && type !== "expense") return null;
 
-    // Perulangan untuk menampilkan setiap transaksi
-    listToRender.forEach(tx => {
-        const card = document.createElement('div');
-        card.className = 'tracker-transaction-item';
-        card.setAttribute('data-testid', 'transaction-card');
+    const date =
+        typeof value.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.date)
+            ? value.date
+            : "";
 
-        const title = document.createElement('div');
-        title.className = 'tracker-transaction-item__detail';
-        title.innerHTML = `<div class="tracker-transaction-item__title">${tx.title}</div>`;
-        title.setAttribute('data-testid', 'transaction-title');
+    return { id: value.id, title, amount, type, date };
+}
 
-        const amount = document.createElement('div');
-        amount.className = 'tracker-transaction-item__right';
-        amount.innerHTML = `<div class="tracker-transaction-item__amount ${tx.type === 'income' ? 'tracker-transaction-item__amount--income' : 'tracker-transaction-item__amount--expense'}">Rp ${formatRupiah(tx.amount)}</div>`;
-        amount.setAttribute('data-testid', 'transaction-amount');
+function loadTransactionsFromStorage() {
+    try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        transactions = Array.isArray(parsed)
+            ? parsed.map(normalizeTransaction).filter((transaction) => transaction !== null)
+            : [];
+    } catch (error) {
+        // Broken or blocked browser storage must not prevent the page from loading.
+        transactions = [];
+        console.warn("Data transaksi lokal tidak dapat dibaca; memulai dengan daftar kosong.", error);
+    }
 
-        const type = document.createElement('p');
-        type.textContent = tx.type;
-        type.setAttribute('data-testid', 'transaction-type');
+    document.dispatchEvent(new Event("transaction:updated"));
+}
 
-        // Container untuk tombol aksi — gunakan class yang sesuai dengan style.css
-        const actions = document.createElement('div');
-        actions.className = 'tracker-transaction-item__actions';
+function renderTransactions() {
+    if (!incomeList || !expenseList) return;
 
-        // Tombol untuk mengubah tipe (income <-> expense)
-        const toggleButton = document.createElement('button');
-        toggleButton.type = 'button';
-        toggleButton.className = 'tracker-transaction-item__btn';
-        toggleButton.textContent = tx.type === 'income' ? 'To Expense' : 'To Income';
-        toggleButton.setAttribute('data-testid', 'transaction-toggle-button');
-        toggleButton.setAttribute('aria-label', 'Ganti tipe transaksi');
-        toggleButton.addEventListener('click', () => {
-            tx.type = tx.type === 'income' ? 'expense' : 'income';
+    incomeList.replaceChildren();
+    expenseList.replaceChildren();
+
+    const visibleTransactions = searchQuery
+        ? transactions.filter((transaction) =>
+              transaction.title.toLocaleLowerCase("id-ID").includes(searchQuery)
+          )
+        : transactions;
+
+    visibleTransactions.forEach((transaction) => {
+        const card = document.createElement("div");
+        card.className = "tracker-transaction-item";
+        card.setAttribute("data-testid", "transaction-card");
+
+        const titleContainer = document.createElement("div");
+        titleContainer.className = "tracker-transaction-item__detail";
+        titleContainer.setAttribute("data-testid", "transaction-title");
+
+        const title = document.createElement("div");
+        title.className = "tracker-transaction-item__title";
+        // Use textContent instead of HTML interpolation to prevent stored-XSS.
+        title.textContent = transaction.title;
+        titleContainer.appendChild(title);
+
+        const amountContainer = document.createElement("div");
+        amountContainer.className = "tracker-transaction-item__right";
+        amountContainer.setAttribute("data-testid", "transaction-amount");
+
+        const amount = document.createElement("div");
+        amount.className =
+            "tracker-transaction-item__amount " +
+            (transaction.type === "income"
+                ? "tracker-transaction-item__amount--income"
+                : "tracker-transaction-item__amount--expense");
+        amount.textContent = `Rp ${formatRupiah(transaction.amount)}`;
+        amountContainer.appendChild(amount);
+
+        const type = document.createElement("p");
+        type.textContent = transaction.type;
+        type.setAttribute("data-testid", "transaction-type");
+
+        card.append(titleContainer, amountContainer, type);
+
+        if (transaction.date) {
+            const date = document.createElement("p");
+            date.className = "tracker-transaction-item__date";
+            date.textContent = transaction.date;
+            date.setAttribute("data-testid", "transaction-date");
+            card.appendChild(date);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "tracker-transaction-item__actions";
+
+        const toggleButton = document.createElement("button");
+        toggleButton.type = "button";
+        toggleButton.className = "tracker-transaction-item__btn";
+        toggleButton.textContent = transaction.type === "income" ? "To Expense" : "To Income";
+        toggleButton.setAttribute("data-testid", "transaction-toggle-button");
+        toggleButton.setAttribute("aria-label", "Ganti tipe transaksi");
+        toggleButton.addEventListener("click", () => {
+            transaction.type = transaction.type === "income" ? "expense" : "income";
             saveTransactionsToStorage();
-            // Beri sinyal bahwa data berubah
-            document.dispatchEvent(new Event('transaction:updated'));
+            document.dispatchEvent(new Event("transaction:updated"));
         });
 
-        // Tombol edit
-        const editButton = document.createElement('button');
-        editButton.type = 'button';
-        editButton.className = 'tracker-transaction-item__btn tracker-transaction-item__btn--edit';
-        editButton.textContent = 'Edit';
-        editButton.setAttribute('data-testid', 'transaction-edit-button');
-        editButton.setAttribute('aria-label', 'Edit transaksi');
-        editButton.addEventListener('click', () => {
-            // Masuk ke mode edit: isi form dengan data transaksi
-            editingid = tx.id;
-            titleInput.value = tx.title;
-            amountInput.value = tx.amount;
-            typeSelect.value = tx.type;
-            submitButton.textContent = 'Update';
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.className = "tracker-transaction-item__btn tracker-transaction-item__btn--edit";
+        editButton.textContent = "Edit";
+        editButton.setAttribute("data-testid", "transaction-edit-button");
+        editButton.setAttribute("aria-label", "Edit transaksi");
+        editButton.addEventListener("click", () => {
+            editingid = transaction.id;
+            titleInput.value = transaction.title;
+            amountInput.value = String(transaction.amount);
+            dateInput.value = transaction.date || todayLocalDate();
+            typeSelect.value = transaction.type;
+            if (submitButton) submitButton.textContent = "Update";
+            titleInput.focus();
         });
 
-        // Tombol hapus
-        const deleteButton = document.createElement('button');
-        deleteButton.type = 'button';
-        deleteButton.className = 'tracker-transaction-item__btn tracker-transaction-item__btn--delete';
-        deleteButton.textContent = 'Delete';
-        deleteButton.setAttribute('data-testid', 'transaction-delete-button');
-        deleteButton.setAttribute('aria-label', 'Hapus transaksi');
-        deleteButton.addEventListener('click', () => {
-            // Hapus dari array
-            transactions = transactions.filter(t => t.id !== tx.id);
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "tracker-transaction-item__btn tracker-transaction-item__btn--delete";
+        deleteButton.textContent = "Delete";
+        deleteButton.setAttribute("data-testid", "transaction-delete-button");
+        deleteButton.setAttribute("aria-label", "Hapus transaksi");
+        deleteButton.addEventListener("click", () => {
+            transactions = transactions.filter((item) => item.id !== transaction.id);
+            if (editingid === transaction.id) resetTransactionForm();
             saveTransactionsToStorage();
-            document.dispatchEvent(new Event('transaction:updated'));
+            document.dispatchEvent(new Event("transaction:updated"));
         });
 
-        actions.appendChild(toggleButton);
-        actions.appendChild(editButton);
-        actions.appendChild(deleteButton);
-
-        card.appendChild(title);
-        card.appendChild(amount);
-        card.appendChild(type);
+        actions.append(toggleButton, editButton, deleteButton);
         card.appendChild(actions);
 
-        // Masukkan kartu ke kontainer yang sesuai
-        if (tx.type === 'income') {
-            incomeList.appendChild(card);
-        } else {
-            expenseList.appendChild(card);
-        }
+        (transaction.type === "income" ? incomeList : expenseList).appendChild(card);
     });
 }
 
-// Simpan ke localStorage
-function saveTransactionsToStorage() {
-    localStorage.setItem('transactions', JSON.stringify(transactions));
-}
-
-// Muat dari localStorage
-function loadTransactionsFromStorage() {
-    const raw = localStorage.getItem('transactions');
-    transactions = raw ? JSON.parse(raw) : [];
-    // Setelah load, beri sinyal agar UI ter-update
-    document.dispatchEvent(new Event('transaction:updated'));
-}
-
-// Format angka jadi string dengan pemisah ribuan (ID locale)
-function formatRupiah(number) {
-    return Number(number).toLocaleString('id-ID');
-}
-
-// Update panel dashboard (income, expense, balance)
 function updateDashboard() {
+    if (!balanceAmount || !incomeAmount || !expenseAmount) return;
+
     const totalIncome = transactions
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-
+        .filter((transaction) => transaction.type === "income")
+        .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
     const totalExpense = transactions
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    const balance = totalIncome - totalExpense;
+        .filter((transaction) => transaction.type === "expense")
+        .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
     incomeAmount.textContent = `Rp ${formatRupiah(totalIncome)}`;
     expenseAmount.textContent = `Rp ${formatRupiah(totalExpense)}`;
-    balanceAmount.textContent = `Rp ${formatRupiah(balance)}`;
+    balanceAmount.textContent = `Rp ${formatRupiah(totalIncome - totalExpense)}`;
 }
 
-// Handler submit form (tambah atau update)
-transactionForm.addEventListener('submit', (e) => {
-    e.preventDefault();
+function resetTransactionForm() {
+    editingid = null;
+    transactionForm?.reset();
+    if (dateInput) dateInput.value = todayLocalDate();
+    if (submitButton) submitButton.textContent = "Simpan";
+}
+
+if (dateInput && !dateInput.value) dateInput.value = todayLocalDate();
+
+transactionForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
 
     const title = titleInput.value.trim();
     const amount = Number(amountInput.value);
+    const date = dateInput?.value || "";
     const type = typeSelect.value;
 
-    // Validasi input (Skilled)
     if (!title) {
-        alert('Judul tidak boleh kosong');
+        alert("Keterangan tidak boleh kosong.");
+        titleInput.focus();
         return;
     }
-    if (!amount || amount < 1) {
-        alert('Nominal harus lebih besar atau sama dengan 1');
+    if (!Number.isFinite(amount) || amount < 1) {
+        alert("Nominal harus berupa angka yang lebih besar dari atau sama dengan Rp 1.");
+        amountInput.focus();
+        return;
+    }
+    if (type !== "income" && type !== "expense") {
+        alert("Pilih klasifikasi transaksi yang valid.");
+        typeSelect.focus();
+        return;
+    }
+    if (!date) {
+        alert("Tanggal transaksi wajib diisi.");
+        dateInput?.focus();
         return;
     }
 
-    if (editingid) {
-        // Update transaksi yang sedang diedit
-        const idx = transactions.findIndex(t => t.id === editingid);
-        if (idx !== -1) {
-            transactions[idx].title = title;
-            transactions[idx].amount = amount;
-            transactions[idx].type = type;
+    if (editingid !== null) {
+        const index = transactions.findIndex((transaction) => transaction.id === editingid);
+        if (index !== -1) {
+            transactions[index] = { ...transactions[index], title, amount, type, date };
         }
-        editingid = null;
-        submitButton.textContent = 'Add Transaction';
     } else {
-        // Tambah transaksi baru
-        const newTx = {
-            id: generateid(),
-            title,
-            amount,
-            type
-        };
-        transactions.push(newTx);
+        transactions.push({ id: generateid(), title, amount, type, date });
     }
 
     saveTransactionsToStorage();
-    // Beri sinyal agar semua bagian ter-update
-    document.dispatchEvent(new Event('transaction:updated'));
-    transactionForm.reset();
+    resetTransactionForm();
+    document.dispatchEvent(new Event("transaction:updated"));
 });
 
-// Listener untuk event custom: panggil render + update dashboard
-document.addEventListener('transaction:updated', () => {
+document.addEventListener("transaction:updated", () => {
     renderTransactions();
     updateDashboard();
 });
 
-// Pencarian (filter) berdasarkan judul
-searchInput.addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    if (!q) {
-        renderTransactions();
-        return;
-    }
-    const filtered = transactions.filter(t => t.title.toLowerCase().includes(q));
-    renderTransactions(filtered);
+searchForm?.addEventListener("submit", (event) => event.preventDefault());
+searchInput?.addEventListener("input", (event) => {
+    searchQuery = event.target.value.trim().toLocaleLowerCase("id-ID");
+    renderTransactions();
 });
 
-// Muat data saat file JS pertama kali dijalankan
 loadTransactionsFromStorage();
