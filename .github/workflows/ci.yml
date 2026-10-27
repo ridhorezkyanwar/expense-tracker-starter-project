@@ -1,0 +1,63 @@
+name: Expense Tracker QA
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check JavaScript syntax
+        run: node --check main.js
+      - name: Check required form controls and local assets
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const html = fs.readFileSync("index.html", "utf8");
+          const js = fs.readFileSync("main.js", "utf8");
+          const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
+          const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+          const requiredIds = [
+            "incomeList",
+            "expenseList",
+            "transactionForm",
+            "transactionFormTitleInput",
+            "transactionFormAmountInput",
+            "transactionFormDateInput",
+            "transactionFormTypeSelect",
+            "searchTransactionForm",
+            "searchTransactionFormTitleInput"
+          ];
+          const missing = requiredIds.filter((id) => !ids.includes(id));
+          const refs = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/gi)]
+            .map((match) => match[1])
+            .filter((ref) => ref && !/^(?:[a-z]+:|\/\/|#|data:)/i.test(ref));
+          const missingAssets = [...new Set(refs)].filter((ref) => {
+            const clean = decodeURIComponent(ref.split(/[?#]/, 1)[0]).replace(/^\.\//, "");
+            return clean && !fs.existsSync(path.resolve(".", clean));
+          });
+          const checks = [
+            ["No duplicate HTML IDs", duplicateIds.length === 0, duplicateIds.join(", ")],
+            ["Required IDs exist for the JavaScript controls", missing.length === 0, missing.join(", ")],
+            ["All local src/href assets exist", missingAssets.length === 0, missingAssets.join(", ")],
+            ["Stored transaction title is rendered as text", js.includes("title.textContent = transaction.title") && !js.includes("title.innerHTML =")]
+          ];
+          for (const [name, pass, detail] of checks) {
+            console.log((pass ? "PASS" : "FAIL") + " " + name + (detail ? ": " + detail : ""));
+          }
+          if (checks.some(([, pass]) => !pass)) process.exit(1);
+          NODE
