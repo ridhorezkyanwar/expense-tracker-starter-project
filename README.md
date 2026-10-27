@@ -1,51 +1,39 @@
-# Expense Tracker App — Starter Project
+# Expense Tracker — Vanilla JavaScript
 
-<p align="center">
-  <img src="https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white" alt="HTML5 badge" />
-  <img src="https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white" alt="CSS3 badge" />
-  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=white" alt="JavaScript badge" />
-</p>
+A small, browser-only expense tracker built with HTML, CSS, and JavaScript. It demonstrates basic transaction management and DOM updates without a backend.
 
-This short, portfolio-focused description explains what the project is, how it works, and what to highlight when showing it in your portfolio. It describes the application in clear, step-by-step prose so reviewers can quickly understand the idea, core features, and the implementation approach.
+## Features
 
----
+- Add income and expense transactions with a description, amount, and date.
+- Display total income, total expenses, and calculated balance.
+- Search transactions by description.
+- Edit a transaction, change its income/expense type, or delete it.
+- Save transactions in the current browser's `localStorage`.
+- Render transaction descriptions as text rather than HTML to avoid stored-XSS from manipulated local data.
 
-Project at a glance
+## Run locally
 
-This is a minimal, client-side Expense Tracker built with plain HTML, CSS, and JavaScript. The app demonstrates how to model simple financial transactions, display a running balance, and separate incomes and expenses in a compact user interface. It is intended as a portfolio piece to show practical front-end skills: DOM manipulation, state management in vanilla JavaScript, and clear UI design.
+Open `index.html` directly in a modern browser, or serve the directory over HTTP:
 
-What the app does — explained step by step (high level)
+```bash
+python -m http.server 8000
+```
 
-1. When the page loads, the static HTML provides the layout: a header, a small summary area that shows total balance, total income, and total expenses, and two lists for income and expense transactions. The CSS styles the layout for a clean, readable presentation.
+Then visit [http://localhost:8000](http://localhost:8000).
 
-2. The JavaScript (main.js) initializes a transactions data structure in memory. Each transaction contains a title/description, an amount, and a type (income or expense). The app keeps this data in a simple array while the user interacts with the page.
+No build step or package manager is required.
 
-3. Adding a transaction: the user fills a form (title + amount + type) and submits. JavaScript validates the input, appends the new transaction to the in-memory array, and re-renders the UI. The new entry appears in the appropriate list (income or expense), and the summary totals update immediately.
+## Data and security limitations
 
-4. Calculating totals: after every change, the app recomputes three derived values from the transactions array — total income, total expenses, and net balance — and updates the summary area in the DOM. Calculations are simple reductions over the array and demonstrate correct numeric handling and formatting.
+- This is a learning demo, not a financial service.
+- Transactions are stored only in the browser profile that created them. They are not sent to a server, synced across devices, or backed up.
+- Browser storage is not encrypted by this app and can be edited by the user or other scripts running on the same origin. Do not enter sensitive financial information.
+- Clearing site data or changing browser profiles can remove access to stored transactions.
+- The app has no user account, authentication, server-side authorization, or automated financial reconciliation.
 
-5. Rendering and accessibility: transactions are rendered as list items with semantic markup and stable identifiers. The UI prioritizes readability: clear labels, formatted currency, and color cues for incomes vs. expenses. Data attributes and element IDs are used to make the UI deterministic for automated checks or simple unit tests.
+## Implementation notes
 
-6. Persistence (optional extension): this starter project stores state in memory by default. As an extension, it can persist transactions to localStorage so the list survives page reloads — a small and demonstrable enhancement that shows awareness of practical UX needs.
-
-Technical notes for reviewers
-
-- Files and roles:
-  - index.html: semantic structure and initial markup.
-  - style.css: visual styles and responsive layout decisions.
-  - main.js: application logic, data handling, validation, rendering, and (optionally) persistence.
-  - README.md: this portfolio description.
-
-- Implementation approach: the project favors simple, explicit code without frameworks. This keeps the focus on core JavaScript skills: event handling, DOM updates, and array transformations. The code is organized to separate concerns (data management vs. DOM rendering) so each part is small and testable.
-
-- What to highlight in a portfolio write-up: 1) the problem statement (track income and expenses simply), 2) the main features (add transaction, view totals, separate lists), 3) technical choices (vanilla JS, separation of concerns, optional localStorage), and 4) possible improvements (validation, editing/deleting transactions, animations, tests).
-
-Design and customization
-
-This starter project intentionally leaves styling open for personalization. For a portfolio, consider customizing colors, typography, and spacing to reflect your design sense. Keep the HTML element IDs and data attributes stable if you plan to add automated tests or keep the app compatible with an evaluation script.
-
-Short example description for a portfolio item
-
-"Expense Tracker — a lightweight client-side app built with HTML, CSS, and vanilla JavaScript. It demonstrates state management without frameworks, precise DOM manipulation, and a clean, responsive UI for tracking incomes and expenses. Optional localStorage persistence preserves data across reloads."
-
-If you want, the README can be expanded with screenshots, a brief code snippet that shows the main rendering function, or a short changelog describing enhancements you made. Tell me which additions you prefer and the README will be updated accordingly.
+- `index.html` contains the forms and summary layout.
+- `style.css` contains presentation.
+- `main.js` implements validation, rendering, search, editing, deletion, and browser storage.
+- The `data-testid` attributes are retained for UI test automation.
