@@ -1,5 +1,7 @@
 # Expense Tracker — Vanilla JavaScript
 
+<p><a href="https://expense-tracker-demo-ashen.vercel.app/"><img src="https://img.shields.io/badge/Live_Demo-Vercel-000000?style=for-the-badge&logo=vercel" alt="Live demo" /></a></p>
+
 A small, browser-only expense tracker built with HTML, CSS, and JavaScript. It demonstrates basic transaction management and DOM updates without a backend.
 
 ## Features
@@ -21,7 +23,7 @@ python -m http.server 8000
 
 Then visit [http://localhost:8000](http://localhost:8000).
 
-No build step or package manager is required.
+No build step or package manager is required. A deployed static demo is available at https://expense-tracker-demo-ashen.vercel.app/.
 
 ## Data and security limitations
 
