@@ -23,6 +23,10 @@ const incomeAmount = document.querySelector(".tracker-summary__stat-amount--inco
 const expenseAmount = document.querySelector(".tracker-summary__stat-amount--expense");
 const searchInput = document.getElementById("searchTransactionFormTitleInput");
 const searchForm = document.getElementById("searchTransactionForm");
+const periodLabel = document.querySelector(".tracker-header__date");
+if (periodLabel) {
+    periodLabel.textContent = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(new Date());
+}
 
 function todayLocalDate() {
     const now = new Date();
